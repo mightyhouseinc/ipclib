@@ -32,7 +32,7 @@ def debug(str):
 def genTaps(max, depth=0, max_depth=1, parent="SPT_TAP"):
     res = ""
     for i in xrange(0, max, 2):
-        name = "%s_%s" % (parent, i)
+        name = f"{parent}_{i}"
         res += ('  ' * depth + '<Tap Name="%s" IrLen="8" IdcodeIr="0x0C"  VerifyProc="verify_idcode()" SerializeProc="common.tap.add_tap(0x11,%s,%s)" DeserializeProc="common.tap.remove_tap(0x11,%s,%s)" AdjustProc="common.tap.read_idcode_and_remove_if_zero()" InsertBeforeParent="false">\n' % (name, i, max, i, max))
         if depth + 1 < max_depth:
             res += genTaps(max, depth + 1, max_depth, name)
@@ -48,8 +48,8 @@ def displayValidIdcodes(prefix=""):
             idcode = d.idcode()
             proc_id = d.irdrscan(0x2, 32)
             if proc_id != 0:
-                idcode += " (" + proc_id.ToHex() + ")"
-            print("%s : %s" % (d.name, idcode))
+                idcode += f" ({proc_id.ToHex()})"
+            print(f"{d.name} : {idcode}")
 
 ipc = connect()
 print(ipc.devicelist)

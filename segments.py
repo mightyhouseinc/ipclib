@@ -6,7 +6,7 @@ from asm import *
 class Selector:
     def __init__(self, bits):
         self.bits = bits
-        self.rpl = bits[0:1]
+        self.rpl = bits[:1]
         self.table = bits[2]
         self.idx = bits[3:15]
 
@@ -20,7 +20,7 @@ class GDTEntry:
         self.base_addr = bits[16:31]
         self.base_addr.Append(bits[32:39])
         self.base_addr.Append(bits[56:63])
-        self.limit = bits[0:15]
+        self.limit = bits[:15]
         self.limit.Append(bits[48:51])
         self.access = bits[40:47]
         self.flags = bits[52:55]
@@ -75,12 +75,12 @@ class IDTEntry:
     def __init__(self, bits):
         # https://wiki.osdev.org/Interrupt_Descriptor_Table
         self.bits = bits
-        self.offset = bits[0:15]
+        self.offset = bits[:15]
         self.offset.Append(bits[48:63])
         self.selector = bits[16:31]
         self.zero = bits[32:39]
         self.type_attr = bits[40:47]
-        self.gate_type = self.type_attr[0:3]
+        self.gate_type = self.type_attr[:3]
         self.s = self.type_attr[4]
         self.privl = self.type_attr[5:6]
         self.pr = self.type_attr[7]
@@ -115,14 +115,11 @@ def print_segment(name, base, limit):
     entries = (limit.ToUInt32() + 1) // 8
     print("%s (%s, %s) has %d entries" % (name, base, limit, entries))
     for i in xrange(entries):
-        segment = t.memblock(str(base.ToUInt32() + 8 * i) + "L", 8, 1)
-        if name == "IDT":
-            entry = IDTEntry(segment)
-        else:
-            entry = GDTEntry(segment)
+        segment = t.memblock(f"{str(base.ToUInt32() + 8 * i)}L", 8, 1)
+        entry = IDTEntry(segment) if name == "IDT" else GDTEntry(segment)
         if entry.pr:
             print("**** %s Entry %d ****" % (name, i))
-            print("%s" % str(entry))
+            print(f"{str(entry)}")
 
 def print_segments():
     gdtbas = t.arch_register("gdtbas")
@@ -153,12 +150,9 @@ def segment_addr_to_linear(selector, addr):
     table = selector[2]
     idx = selector[3:15].ToUInt32()
     base = t.arch_register("ldtbas" if table else "gdtbas")
-    segment = t.memblock(str(base.ToUInt32() + 8 * idx) + "L", 8, 1)
+    segment = t.memblock(f"{str(base.ToUInt32() + 8 * idx)}L", 8, 1)
     entry = GDTEntry(segment)
-    if addr < entry.limit:
-        return entry.base_addr + addr
-    else:
-        return None
+    return entry.base_addr + addr if addr < entry.limit else None
 
 def table_to_mmio(base, limit):
     entries = (limit.ToUInt32() + 1) // 8
@@ -202,8 +196,8 @@ def dump_ldts():
     limit = t.arch_register("ldtlim")
     entries = (limit.ToUInt32() + 1) // 8
     for i in xrange(entries):
-        segment = t.memblock(str(base.ToUInt32() + 8 * i) + "L", 8, 1)
+        segment = t.memblock(f"{str(base.ToUInt32() + 8 * i)}L", 8, 1)
         entry = GDTEntry(segment)
         if entry.pr:
-            t.memsave("LDT-" + i + ".bin", str(entry.base.ToUInt32()) + "L")
+            t.memsave(f"LDT-{i}.bin", f"{str(entry.base.ToUInt32())}L")
     

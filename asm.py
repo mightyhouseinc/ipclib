@@ -4,16 +4,13 @@ from segments import *
 from proc import *
 
 def get_registers(thread):
-    registers = []
     register_list = ["eax", "ebx", "ecx", "edx", "esi", "edi", "ebp", "esp", "eip"]
-    for reg in register_list:
-        registers.append((reg, thread.arch_register(reg)))
-    return registers
+    return [(reg, thread.arch_register(reg)) for reg in register_list]
 
 def print_registers(thread=None):
     if thread is None:
         thread = t
-        
+
     was_running = False
     # Halt the thread if needed
     if thread.isrunning():
@@ -22,7 +19,7 @@ def print_registers(thread=None):
     registers = get_registers(thread)
     print ("Registers : ")
     for (reg, val) in registers:
-        print("%s: %s" % (reg, val.ToHex()))
+        print(f"{reg}: {val.ToHex()}")
     if was_running:
         thread.go()
 
@@ -83,7 +80,7 @@ def v3_resume():
 
 def pop():
     ss = reg("ss")
-    ret = t.mem(ss.ToHex() + ":" + reg("esp").ToHex(), 4)
+    ret = t.mem(f"{ss.ToHex()}:" + reg("esp").ToHex(), 4)
     reg("esp", reg("esp") + 4)
     return ret
 
@@ -166,16 +163,18 @@ def printStackContent():
     table = ss[2]
     idx = ss[3:15]
     base = t.arch_register("ldtbas" if table else "gdtbas")
-    segment = GDTEntry(t.memblock(str(base.ToUInt32() + 8 * idx.ToUInt32()) + "L", 8, 1))
+    segment = GDTEntry(
+        t.memblock(f"{str(base.ToUInt32() + 8 * idx.ToUInt32())}L", 8, 1)
+    )
     limit = segment.limit
-    print("ESP : %s" % esp.ToHex())
+    print(f"ESP : {esp.ToHex()}")
     esp = esp & ~0xF
-    t.memdump(ss.ToHex() + ":" + esp.ToHex(), limit - esp, 1)
+    t.memdump(f"{ss.ToHex()}:{esp.ToHex()}", limit - esp, 1)
 
 def peek(register, offset=0, size=4, value=None):
     ds = reg("ds")
     reg_value = reg(register)
-    return t.mem(ds.ToHex() + ":" + hex(reg_value + offset), size, value)
+    return t.mem(f"{ds.ToHex()}:{hex(reg_value + offset)}", size, value)
 
 def poke(register, offset=0, value=None, size=4):
     return peek(register, offset, size, value)
