@@ -8,7 +8,6 @@ from xhci import *
 
 try:
     t.halt()
-    pass
 except:
     pass
 

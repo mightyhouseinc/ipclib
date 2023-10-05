@@ -49,16 +49,7 @@ class TRB(Data):
         Data.__init__(self, 128, data)
 
     def __repr__(self):
-        return "TRB : {}\n" \
-            "  PTR Low : {}\n" \
-            "  PTR High: {}\n" \
-            "  Status: {}\n" \
-            "  Control: {}\n" \
-            .format(self.data,
-                    self.get(self.PTR_LOW),
-                    self.get(self.PTR_HIGH),
-                    self.get(self.STATUS),
-                    self.get(self.CONTROL))
+        return f"TRB : {self.data}\n  PTR Low : {self.get(self.PTR_LOW)}\n  PTR High: {self.get(self.PTR_HIGH)}\n  Status: {self.get(self.STATUS)}\n  Control: {self.get(self.CONTROL)}\n"
 
         
 class TRBPtrBits:
@@ -200,7 +191,7 @@ class XHCICommandRing(XHCICycleRing):
 
     def post_command(self):
         trb = self.TRB()
-        xhci_debug("Posting command %s" % TRBType.name(trb.get(TRBControlBits.TT)))
+        xhci_debug(f"Posting command {TRBType.name(trb.get(TRBControlBits.TT))}")
         # Set Cycle bit
         trb.set(TRBControlBits.C, self.pcs)
         trb.write(self.current)
@@ -236,8 +227,7 @@ class XHCICommandRing(XHCICycleRing):
         cc = self.wait_for_command(cmd, False)
         if cc == TRBCompletionCode.SUCCESS:
             trb = xhci.er.TRB()
-            slot_id = trb.get(TRBControlBits.ID)
-            return slot_id
+            return trb.get(TRBControlBits.ID)
         return None
             
     def address_device(self, slot_id, ic):
@@ -420,8 +410,10 @@ class XHCIDevice:
         self.slot = SlotContext(self.ctx)
         self.ep0 = EPContext(self.ctx + 0x20)
         self.eps = []
-        for i in range(0x40, 0x40 + 0x20 * (self.NUM_EPS - 2), 0x20):
-            self.eps.append(EPContext(self.ctx + i))
+        self.eps.extend(
+            EPContext(self.ctx + i)
+            for i in range(0x40, 0x40 + 0x20 * (self.NUM_EPS - 2), 0x20)
+        )
 
     def __getitem__(self, idx):
         if int(idx) > 30:
@@ -452,7 +444,7 @@ class XHCI:
     def dump_pci_config(self):
         sb_mmio, _ = setup_sideband_channel(0x050400 | self.port, 0, self.fid << 3)
         t.memdump(phys(sb_mmio), 0x100, 1)
-        save_mmios(pwd, [(sb_mmio, 0x1000)], "PCI_" + str(self.fid) + ".0_")
+        save_mmios(pwd, [(sb_mmio, 0x1000)], f"PCI_{str(self.fid)}.0_")
     
     def check_pci_from_ME(self):
         sb_mmio, _ = setup_sideband_channel(0x050400 | self.port, 0, self.fid << 3)
@@ -599,15 +591,15 @@ class XHCI:
         self.page_size = self.bar_read16(0x88).ToUInt32() << 12
         self.max_slots = self.bar_read32(0x4).ToUInt32() & 0xff
         self.max_ports = (self.bar_read32(0x4).ToUInt32() & 0xff000000) >> 24
-        xhci_debug("caplen:  %s" % hex(self.bar_read32(0)))
-        xhci_debug("rtsoff:  %s" % hex(self.bar_read32(0x18)))
-        xhci_debug("dboff:   %s" % hex(self.bar_read32(0x14)))
+        xhci_debug(f"caplen:  {hex(self.bar_read32(0))}")
+        xhci_debug(f"rtsoff:  {hex(self.bar_read32(24))}")
+        xhci_debug(f"dboff:   {hex(self.bar_read32(20))}")
         xhci_debug("hciversion: %d.%d" % (self.bar_read8(0x3), self.bar_read8(0x2)))
         xhci_debug("Max Slots:   %d" % self.max_slots)
         xhci_debug("Max Ports:   %d" % self.max_ports)
         xhci_debug("Page Size:   %d" % self.page_size)
 
-        
+
         # Allocate resources
         self.dcbaa = dma_align(64, (self.max_slots + 1 ) * 8, memset_value=0)
         max_sp_hi = (self.bar_read32(0x8) & 0x03E00000) >> 21
@@ -622,11 +614,11 @@ class XHCI:
             self.set(self.dcbaa, self.sp_ptrs)
         self.dma_buffer = dma_align(64 * 1024, 64 * 1024)
         self.cr = XHCICommandRing(4)
-        xhci_debug("command ring %s" % hex(self.cr.ring))
+        xhci_debug(f"command ring {hex(self.cr.ring)}")
         self.er = XHCIEventRing(64)
-        xhci_debug("event ring %s" % hex(self.er.ring))
+        xhci_debug(f"event ring {hex(self.er.ring)}")
         self.ev_ring_table = dma_align(64, 0x10, memset_value=0)
-        xhci_debug("event ring table %s" % hex(self.ev_ring_table))
+        xhci_debug(f"event ring table {hex(self.ev_ring_table)}")
 
         # Setup hardware
         self.wait_ready()
@@ -636,10 +628,10 @@ class XHCI:
 
         self.bar_write32(0x98, self.cr.ring | 0x1)
         self.bar_write32(0x9c, 0)
-        
+
         self.set(self.ev_ring_table, self.er.ring)
         self.set(self.ev_ring_table + 8, 64)
-        
+
         self.bar_write32(0x2028, 1) # Size of evet ring table
         self.bar_write32(0x2030, self.ev_ring_table)
         self.bar_write32(0x2034, 0)
@@ -652,8 +644,8 @@ class XHCI:
 
         cc = self.cr.noop()
         running = self.bar_read32(0x98) & 8
-        xhci_debug("NOOP result : %s" % TRBCompletionCode.name(cc))
-        xhci_debug("Command ring is %s" % ("running" if running else "not running"))
+        xhci_debug(f"NOOP result : {TRBCompletionCode.name(cc)}")
+        xhci_debug(f'Command ring is {"running" if running else "not running"}')
 
         self.devs = [None]* self.max_ports
         self.transfer_rings = [None]* self.max_ports
@@ -679,7 +671,7 @@ class XHCI:
             portsc[4] = 1
             self.bar_write32(0x480 + 0x10 *port, portsc)
         else:
-            xhci_debug("Unknown port state %s" % pls)
+            xhci_debug(f"Unknown port state {pls}")
         timeout = 100
         while True:
             portsc = self.bar_read32(0x480 + 0x10 * port)

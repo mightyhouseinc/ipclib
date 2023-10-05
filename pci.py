@@ -30,15 +30,24 @@ def list_pci_devices(base_addr=0xE0000000, alt="", bars=True):
             for func in range (8):
                 device = PCIDevice(bus, dev, func, t, base_addr)
                 vid = device.getVID()
-                if vid != 0xFFFFFFFF and vid != 0x0:
+                if vid not in [0xFFFFFFFF, 0x0]:
                     print("PCI %d.%d.%d : %s" % (bus, dev, func, vid.ToHex()))
-                    mmio.save_mmios(pwd, [(device.getIOAddress(), 0x1000)], "PCI_" + alt + "%d.%d.%d_" % (bus, dev, func) )
+                    mmio.save_mmios(
+                        pwd,
+                        [(device.getIOAddress(), 0x1000)],
+                        f"PCI_{alt}" + "%d.%d.%d_" % (bus, dev, func),
+                    )
                     if bars:
                         for offset in range(0x10, 0x28, 4):
                             bar = device.readWord(offset)
                             if bar != 0:
-                                bar[0:7] = 0
-                                mmio.save_mmios(pwd, [(bar, 0x1000)], "BAR_" + alt + "%d.%d.%d_" % (bus, dev, func))
+                                bar[:7] = 0
+                                mmio.save_mmios(
+                                    pwd,
+                                    [(bar, 0x1000)],
+                                    f"BAR_{alt}"
+                                    + "%d.%d.%d_" % (bus, dev, func),
+                                )
                 elif dev == 0 and func == 0:
                     break
             else:

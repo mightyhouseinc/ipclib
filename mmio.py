@@ -98,7 +98,7 @@ def save_mmios(pwd, mmios, prefix="MMIO_"):
     # Sort by size
     mmios.sort(lambda a, b: cmp(a[1], b[1]) if a[1] != b[1] else cmp(a[0], b[0]))
     for (addr, size) in mmios:
-        print("Addr: %s, size: %s" % (hex(addr), hex(size)))
+        print(f"Addr: {hex(addr)}, size: {hex(size)}")
         path = os.path.join(pwd, prefix + hex(addr)[2:].replace("L", "") + ".bin")
         if os.path.exists(path):
             statinfo = os.stat(path)
@@ -110,8 +110,7 @@ def save_mmios(pwd, mmios, prefix="MMIO_"):
         with open(path, "ab") as f:
             while size > 0:
                 chunk = 4 * 1024
-                if chunk > size:
-                    chunk = size
+                chunk = min(chunk, size)
                 f.write(memtostr(phys(addr), chunk))
                 addr += chunk
                 size -= chunk
@@ -124,7 +123,7 @@ def save_mmios(pwd, mmios, prefix="MMIO_"):
 def bruteforce_sideband(pwd, group=0, start=0, end=0x100, size=0x8000, rs=1, fid=0):
     for i in xrange(start, end):
         channel = (group << 8) + i
-        print("Dumping Sideband : %s" % hex(channel))
+        print(f"Dumping Sideband : {hex(channel)}")
         dump_sideband_channel(pwd, channel, size=size, rs=rs, fid=fid)
 
 def bruteforce_sideband_port(pwd, port, start=0, end=0x100, size=0x1000):
@@ -153,7 +152,7 @@ def dump_sideband_channel(pwd, channel, size=0x8000, rs=1, fid=0):
     sb_channel_port_addr = proc_get_address(t, "SB_CHANNEL")
     sb_mmio, _ = setup_sideband_channel(channel, rs, fid)
     t.memdump(phys(sb_mmio), 0x10, 1)
-    save_mmios(pwd, [(sb_mmio, size)], "SB_" + hex(channel) + "_")
+    save_mmios(pwd, [(sb_mmio, size)], f"SB_{hex(channel)}_")
 
     try:
         a = t.mem(phys(sb_channel_port_addr + 0x18), 4)

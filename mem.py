@@ -128,14 +128,14 @@ def print_pages():
 def linear_to_pages(addr):
     addr_bits = ipc.BitData(32, addr)
     directory = addr_bits[22:31].ToUInt32()
-    offset = addr_bits[0:21].ToUInt32()
+    offset = addr_bits[:21].ToUInt32()
     pd = reg("cr3")
     pde = t.memblock(phys(pd + directory*4), 4, 1)
     pde = PDE(directory, pde)
     if pde.present:
         if pde.size == 0:
             table = addr_bits[12:21].ToUInt32()
-            offset = addr_bits[0:11].ToUInt32()
+            offset = addr_bits[:11].ToUInt32()
             pt = pde.base_addr << 12
             pte = t.memblock(phys(pt + table*4), 4, 1)
             pte = PTE(pde, table, pte)
@@ -172,19 +172,15 @@ def virt_to_phys(addr, selector="ds"):
 def linear_to_phys(addr):
     (pde, pte, offset) = linear_to_pages(addr)
     if pte:
-        if pte.present:
-            return pte.base_addr.ToUInt32() << 12 | offset
-        return None
-    if pde.present:
-        return pde.base_addr.ToUInt32() << 12 | offset
-    return None
+        return pte.base_addr.ToUInt32() << 12 | offset if pte.present else None
+    return pde.base_addr.ToUInt32() << 12 | offset if pde.present else None
     
 def dump_pages(filename):
     save_to_file(filename, print_pages)
 
 def memdump_ds(addr, size=0x10):
     ds = reg("ds")
-    return t.memdump(ds.ToHex() + ":" + hex(addr), size, 1)
+    return t.memdump(f"{ds.ToHex()}:{hex(addr)}", size, 1)
 
 def memset(addr, value, size):
     t.memblock(phys(addr), int(size), 4, value)
@@ -199,25 +195,26 @@ def phys(addr):
 
 def malloc(size):
     malloc_func = proc_get_address(t, "SYSLIB:MALLOC")
-    execute_asm(t,
-                "push %s" % hex(size),
-                # Need to call using register because asm uses near call and if I
-                # do a far call with 'cs:addr', it pushes cs to the stack so it always
-                # allocates 0x1bc bytes
-                "mov eax, %s" % hex(malloc_func).replace("L", ""),
-                "call eax")
+    execute_asm(
+        t,
+        f"push {hex(size)}",
+        f'mov eax, {hex(malloc_func).replace("L", "")}',
+        "call eax",
+    )
     wait_until_infinite_loop(t, False)
     return reg("eax")
 
 def malign(alignment, size):
     malign_func = proc_get_address(t, "SYSLIB:MALIGN")
-    execute_asm(t,
-                "push 0",
-                "push %s" % hex(size),
-                "push %s" % hex(alignment),
-                "push 0",
-                "mov eax, %s" % hex(malign_func).replace("L", ""),
-                "call eax")
+    execute_asm(
+        t,
+        "push 0",
+        f"push {hex(size)}",
+        f"push {hex(alignment)}",
+        "push 0",
+        f'mov eax, {hex(malign_func).replace("L", "")}',
+        "call eax",
+    )
     wait_until_infinite_loop(t, False)
     return reg("eax")
 
